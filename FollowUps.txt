@@ -1,0 +1,21 @@
+Models:
+llama3.1:8b
+mistral:7b
+qwen2.5:7b
+qwen2.5:3b
+qwen2.5-coder:7b
+qwen3:8b
+qwen3:4b
+qwen3:1.7b
+granite3.3:8b
+
+# Start the server
+ollama serve
+# Stop the server
+taskkill /F /IM ollama.exe
+
+tasklist | findstr ollama
+
+taskkill /PID 24216 /F
+
+
