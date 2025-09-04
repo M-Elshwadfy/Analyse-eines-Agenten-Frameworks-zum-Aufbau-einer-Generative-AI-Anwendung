@@ -1,0 +1,36 @@
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
+from pypdf import PdfReader
+import logfire
+
+logfire.configure()
+logfire.instrument_pydantic_ai()
+
+# Lokalen LLM-Endpunkt und Modell wählen
+provider = OpenAIProvider(base_url="http://localhost:11434/v1")
+model = OpenAIModel("qwen3:8b", provider=provider)
+
+# PDF-Pfad als Dependency (wird nicht vom LLM bestimmt)
+pdf_path = "/home/student/myenv/dummy.pdf"
+
+# Agent mit Anweisung: nur aus dem Dokument antworten
+agent = Agent(
+    model=model,
+    system_prompt=(
+        "Call get_pdf_text to read content of the PDF.\n"
+        "Answer ONLY from the document text; otherwise say 'I don't know.'"
+    ),
+)
+
+# Tool mit Kontext: liest den Pfad aus ctx.deps (String)
+@agent.tool
+def get_pdf_text(ctx: RunContext[str]) -> str:
+    """Return extracted text from the PDF at deps.path"""
+    reader = PdfReader(ctx.deps)  # ctx.deps enthält den PDF-Pfad
+    text = "".join((pg.extract_text() or "") for pg in reader.pages)  # Text seitenweise extrahieren
+    return text  # Ohne Kürzung zurückgeben
+
+# Run: Frage stellen und den PDF-Pfad als deps übergeben
+result = agent.run_sync("What is the content of the pdf", deps=pdf_path)
+print(result.output)  # Ausgabe der Agent-Antwort
