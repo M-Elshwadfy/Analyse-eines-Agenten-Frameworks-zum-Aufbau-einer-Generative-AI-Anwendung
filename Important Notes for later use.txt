@@ -1,5 +1,0 @@
-When using AI models, you usually just send a text prompt and get back a text response. This can be messy:
-	You might not know what kind of answer to expect.
-	The answer could be wrong, incomplete, or in the wrong format.
-	It's hard to build reliable software around something unpredictable.
-PydanticAI solves this by using something called Pydantic models to describe what the input and output should look like — like giving the AI a blueprint to follow.
