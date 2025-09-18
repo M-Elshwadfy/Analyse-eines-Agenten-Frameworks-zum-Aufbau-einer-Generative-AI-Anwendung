@@ -5,8 +5,6 @@ from pydantic_ai.models.openai import OpenAIModel  # Modell-Wrapper
 from pydantic_ai.providers.openai import OpenAIProvider  # Provider (z. B. Ollama)
 from pydantic_ai.settings import ModelSettings  # Einstellungen (Temp., Tokens)
 from pydantic_ai.toolsets import FunctionToolset # Sammlung/Registrierung von Tools
-from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool # DuckDuckGo-Suche
-
 from ddgs import DDGS                    # DuckDuckGo-Suche
 import logfire, io, contextlib, traceback  # Logging & Hilfsfunktionen
 from datetime import datetime            # Datum/Zeit
@@ -29,7 +27,7 @@ supervisor_model = OpenAIModel(
 )  # Supervisor/Steuerungsmodell
 
 qwen3_8B_model = OpenAIModel(
-    "qwen3:1.7b",
+    "qwen3:8b",
     settings=ModelSettings(temperature=0.0),
     provider=provider
 )  # Kompaktes Qwen-Modell für einfache Aufgaben
@@ -130,11 +128,25 @@ test_generator_agent = Agent(
 # --- Web-Sucher-Agent ---
 web_searcher_agent = Agent(
     model=qwen3_8B_model,                            # leichtes Modell für Websuche
-    tools=[duckduckgo_search_tool()],
     instructions=(
         "Search DuckDuckGo for the given query and return the results."
-    )   # klare Tool-Nutzung vorgeben
+    ),  # klare Tool-Nutzung vorgeben
 )
+
+@web_searcher_agent.tool_plain
+def web_searcher(query: str, max_results: int = 5) -> str:
+    """Searches the web using DuckDuckGo"""
+    try:
+        with DDGS() as ddg:                          # DDG-Sitzung öffnen
+            results = list(ddg.text(query, max_results=max_results))  # Top-Treffer holen
+            # kurze Auflistung: Titel, Snippet, Link
+            summary = "\n".join(
+                [f"- {r.get('title')}: {r.get('body')} ({r.get('href')})" for r in results]
+            )
+            return summary or "No results."          # leere Liste absichern
+    except Exception as e:
+        return f"Search error: {e}"                  # robuste Fehlerbehandlung
+
 # ---------- Tool-Wrapper (orchestrieren mehrere Agenten) ----------
 def pdf_extractor_tool(ctx: RunContext[bool]) -> str:
     """Tool for extracting pdf content."""
@@ -195,7 +207,7 @@ supervisor_agent = Agent(
 )
 
 supervisor_2_agent = Agent(
-    model=qwen3_8B_model,                      # alternative Supervisor-Variante
+    model=qwen3_14B_model,                      # alternative Supervisor-Variante
     system_prompt="Be concise.",
     deps_type=bool,
     instructions=(
@@ -278,7 +290,7 @@ evaluator_agent = Agent(
     deps_type=Tuple[str, str],             # deps = (Pfad_Musterlösung, Pfad_Studentenantworten)
     tools=[read_txt_file]                  # darf Lese-Tool nutzen, um beide Dateien einzulesen
 )
-"""
+
 # -------------------- Run Supervisor --------------------
 # Schritt 1: Studierendenaufgabe aus PDF extrahieren (nur Inhalt)
 student_task_result = supervisor_agent.run_sync(
@@ -367,7 +379,3 @@ for i in range(1, 4):
 # -------------------- PDF Trick Prompt --------------------
 trick_pdf = supervisor_agent.run_sync("What does PDF mean?")
 print(trick_pdf.output)
-"""
-
-result = supervisor_2_agent.run_sync("Use the web searcher tool to search for Pydantic and return only one result", toolsets=[supervisor_toolset])
-print(result.output)
